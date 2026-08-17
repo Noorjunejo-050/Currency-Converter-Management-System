@@ -1,0 +1,481 @@
+#include <iostream>
+#include <cmath>
+#include <cstring>
+#include <stdlib.h>
+
+using namespace std;
+
+// ============ COLOR CODES FOR CONSOLE ============
+// For Windows
+
+    #define COLOR_RED "\x1B[91m"
+    #define COLOR_GREEN "\x1B[92m"
+    #define COLOR_YELLOW "\x1B[93m"
+    #define COLOR_BLUE "\x1B[94m"
+    #define COLOR_MAGENTA "\x1B[95m"
+    #define COLOR_CYAN "\x1B[96m"
+    #define COLOR_WHITE "\x1B[97m"
+    #define COLOR_RESET "\x1B[0m"
+
+
+// Constants
+const int MAX_CURRENCIES = 25;
+const int MAX_HISTORY = 100;
+const int STR_LEN = 20;
+const char ADMIN_PASSWORD[] = "admin123";
+
+// Structure to store currency information
+struct Currency {
+    char code[STR_LEN];      // e.g., "USD"
+    char name[STR_LEN];      // e.g., "US Dollar"
+    char country[STR_LEN];   // e.g., "United States"
+    double rate;             // Exchange rate vs USD
+};
+
+// Structure to store conversion record
+struct Conversion {
+    double amount;           // Amount converted
+    char fromCurrency[STR_LEN];
+    char toCurrency[STR_LEN];
+    double result;           // Conversion result
+    double rateUsed;         // Exchange rate used
+};
+
+// Global arrays
+Currency currencies[MAX_CURRENCIES] = {
+    {"USD", "US Dollar", "United States", 1.0},
+    {"EUR", "Euro", "Europe", 0.92},
+    {"GBP", "Pound", "United Kingdom", 0.79},
+    {"JPY", "Yen", "Japan", 110.5},
+    {"CAD", "Canadian Dollar", "Canada", 1.27},
+    {"AUD", "Australian Dollar", "Australia", 1.35},
+    {"CHF", "Swiss Franc", "Switzerland", 0.88},
+    {"INR", "Indian Rupee", "India", 74.5},
+    {"CNY", "Chinese Yuan", "China", 6.45},
+    {"MXN", "Mexican Peso", "Mexico", 20.15},
+    {"PKR", "Pakistani Rupee", "Pakistan", 176.5},
+    {"BRL", "Brazilian Real", "Brazil", 5.25},
+    {"RUB", "Russian Ruble", "Russia", 75.80},
+    {"KRW", "South Korean Won", "South Korea", 1190.50},
+    {"SGD", "Singapore Dollar", "Singapore", 1.35},
+    {"HKD", "Hong Kong Dollar", "Hong Kong", 7.78},
+    {"SEK", "Swedish Krona", "Sweden", 8.65},
+    {"NZD", "New Zealand Dollar", "New Zealand", 1.42},
+    {"ZAR", "South African Rand", "South Africa", 14.85},
+    {"TRY", "Turkish Lira", "Turkey", 8.45},
+    {"AED", "UAE Dirham", "Dubai/UAE", 3.67},
+    {"SAR", "Saudi Riyal", "Saudi Arabia", 3.75},
+    {"QAR", "Qatari Riyal", "Qatar", 3.64},
+    {"KWD", "Kuwaiti Dinar", "Kuwait", 0.30},
+    {"IRR", "Iranian Rial", "Iran", 42105.00}
+};
+
+Conversion history[MAX_HISTORY];
+int historyCount = 0;
+
+// Convert string to uppercase
+void toUpperCase(char str[]) {
+    for (int i = 0; str[i]; i++)
+        str[i] = toupper(str[i]);
+}
+
+// Find currency index by code (returns -1 if not found)
+int findCurrencyIndex(char code[]) {
+    for (int i = 0; i < MAX_CURRENCIES; i++) {
+        if (strcmp(code, currencies[i].code) == 0)
+            return i;
+    }
+    return -1;
+}
+
+// Print spaces for formatting
+void printSpaces(int count) {
+    for (int i = 0; i < count; i++)
+        cout << " ";
+}
+
+// Ask user if they want to continue
+bool askToContinue() {
+    char choice;
+    cout << "\n" << COLOR_CYAN << "======================================================\n" << COLOR_RESET;
+    cout << COLOR_YELLOW << "Do you want to continue? (y/n): " << COLOR_RESET;
+    cin >> choice;
+    
+    if (choice == 'y' || choice == 'Y') {
+        return true;
+    } else {
+        return false;
+    }
+}
+
+// ============ DISPLAY FUNCTIONS ============
+
+// Display main menu
+void displayMenu() {
+    cout << "\n";
+    cout << COLOR_CYAN << "======================================================\n" << COLOR_RESET;
+    cout << COLOR_MAGENTA << "   CURRENCY CONVERTER MANAGEMENT SYSTEM\n";
+    cout << "          (25 Currencies Supported)\n";
+    cout << "  Includes: Pakistan, UAE, Saudi Arabia, Qatar, etc.\n" << COLOR_RESET;
+    cout << COLOR_CYAN << "======================================================\n" << COLOR_RESET;
+    cout << COLOR_GREEN << "1. Convert Currency\n";
+    cout << "2. View Exchange Rates\n";
+    cout << "3. Search Currency by Code\n";
+    cout << "4. Update Exchange Rate (Admin)\n";
+    cout << "5. View Conversion History\n";
+    cout << "6. Clear History\n";
+    cout << "7. Exit\n" << COLOR_RESET;
+    cout << COLOR_CYAN << "------------------------------------------------------\n" << COLOR_RESET;
+    cout << COLOR_YELLOW << "Enter your choice: " << COLOR_RESET;
+}
+
+// Display all currencies
+void displayCurrencies() {
+    cout << "\n" << COLOR_BLUE << "Available Currencies (25 Total):\n";
+    cout << "======================================================\n";
+    cout << "Code    Currency Name       Country              Rate\n";
+    cout << "----    -------             -------              ----\n" << COLOR_RESET;
+    
+    for (int i = 0; i < MAX_CURRENCIES; i++) {
+        cout << COLOR_GREEN << currencies[i].code << COLOR_RESET;
+        printSpaces(7 - strlen(currencies[i].code));
+        
+        cout << currencies[i].name;
+        printSpaces(19 - strlen(currencies[i].name));
+        
+        cout << currencies[i].country;
+        printSpaces(20 - strlen(currencies[i].country));
+        
+        cout << COLOR_YELLOW << currencies[i].rate << COLOR_RESET << "\n";
+    }
+    cout << COLOR_BLUE << "======================================================\n" << COLOR_RESET;
+}
+
+// ============ MENU OPTION 1: CONVERT CURRENCY ============
+
+void convertCurrency() {
+    char srcCode[STR_LEN];
+    char tgtCode[STR_LEN];
+    double amount;
+
+    cout << "\n" << COLOR_CYAN << "======================================================\n";
+    cout << "           CURRENCY CONVERSION\n";
+    cout << "======================================================\n" << COLOR_RESET;
+
+    // Display available currencies
+    displayCurrencies();
+
+    // Get source currency
+    cout << COLOR_YELLOW << "Enter source currency code (e.g., PKR or AED): " << COLOR_RESET;
+    cin >> srcCode;
+    toUpperCase(srcCode);
+
+    int srcIndex = findCurrencyIndex(srcCode);
+    if (srcIndex == -1) {
+        cout << COLOR_RED << "ERROR: Source currency '" << srcCode << "' not found!\n" << COLOR_RESET;
+        return;
+    }
+
+    cout << COLOR_GREEN << "Source: " << srcCode << " (" << currencies[srcIndex].country << ")\n" << COLOR_RESET;
+
+    // Get target currency
+    cout << COLOR_YELLOW << "Enter target currency code (e.g., USD or SAR): " << COLOR_RESET;
+    cin >> tgtCode;
+    toUpperCase(tgtCode);
+
+    int tgtIndex = findCurrencyIndex(tgtCode);
+    if (tgtIndex == -1) {
+        cout << COLOR_RED << "ERROR: Target currency '" << tgtCode << "' not found!\n" << COLOR_RESET;
+        return;
+    }
+
+    cout << COLOR_GREEN << "Target: " << tgtCode << " (" << currencies[tgtIndex].country << ")\n" << COLOR_RESET;
+
+    // Get amount
+    cout << COLOR_YELLOW << "Enter amount to convert: " << COLOR_RESET;
+    cin >> amount;
+
+    // Input validation
+    if (cin.fail()) {
+        cin.clear();
+        cin.ignore(10000, '\n');
+        cout << COLOR_RED << "ERROR: Invalid input! Please enter a valid number.\n" << COLOR_RESET;
+        return;
+    }
+
+    // Check for negative amount
+    if (amount < 0) {
+        cout << COLOR_RED << "ERROR: Amount cannot be negative!\n" << COLOR_RESET;
+        return;
+    }
+
+    // Calculate conversion
+    double conversionRate = currencies[tgtIndex].rate / currencies[srcIndex].rate;
+    double result = amount * conversionRate;
+
+    // Display result
+    cout << "\n" << COLOR_CYAN << "======================================================\n";
+    cout << "                CONVERSION RESULT\n";
+    cout << "======================================================\n" << COLOR_RESET;
+    cout << COLOR_GREEN << amount << " " << srcCode << COLOR_RESET << " = " << COLOR_MAGENTA << result << " " << tgtCode << COLOR_RESET << "\n\n";
+    cout << COLOR_YELLOW << "Exchange Rate: 1 " << srcCode << " = " << conversionRate << " " << tgtCode << COLOR_RESET << "\n";
+    cout << COLOR_CYAN << "======================================================\n" << COLOR_RESET;
+
+    // Save to history
+    if (historyCount < MAX_HISTORY) {
+        history[historyCount].amount = amount;
+        strcpy(history[historyCount].fromCurrency, srcCode);
+        strcpy(history[historyCount].toCurrency, tgtCode);
+        history[historyCount].result = result;
+        history[historyCount].rateUsed = conversionRate;
+        historyCount++;
+        cout << COLOR_GREEN << "Conversion saved to history.\n" << COLOR_RESET;
+    } else {
+        cout << COLOR_RED << "WARNING: History buffer is full!\n" << COLOR_RESET;
+    }
+}
+
+// ============ MENU OPTION 2: VIEW EXCHANGE RATES ============
+
+void viewExchangeRates() {
+    cout << "\n" << COLOR_CYAN << "======================================================\n";
+    cout << "     CURRENT EXCHANGE RATES (All vs USD)\n";
+    cout << "======================================================\n" << COLOR_RESET;
+
+    displayCurrencies();
+}
+
+// ============ MENU OPTION 3: SEARCH CURRENCY ============
+
+void searchCurrency() {
+    char code[STR_LEN];
+
+    cout << "\n" << COLOR_CYAN << "======================================================\n";
+    cout << "           SEARCH CURRENCY BY CODE\n";
+    cout << "======================================================\n" << COLOR_RESET;
+
+    cout << COLOR_YELLOW << "Enter currency code to search (e.g., PKR, AED, SAR): " << COLOR_RESET;
+    cin >> code;
+    toUpperCase(code);
+
+    int index = findCurrencyIndex(code);
+    if (index == -1) {
+        cout << COLOR_RED << "ERROR: Currency '" << code << "' not found!\n" << COLOR_RESET;
+        return;
+    }
+
+    cout << "\n" << COLOR_GREEN << "--- Currency Found ---\n";
+    cout << "Code:    " << currencies[index].code << "\n";
+    cout << "Name:    " << currencies[index].name << "\n";
+    cout << "Country: " << currencies[index].country << "\n" << COLOR_RESET;
+    cout << COLOR_YELLOW << "Rate:    " << currencies[index].rate << " per USD\n" << COLOR_RESET;
+    cout << COLOR_GREEN << "---\n" << COLOR_RESET;
+}
+
+// ============ MENU OPTION 4: UPDATE EXCHANGE RATE (ADMIN) ============
+
+void updateExchangeRate() {
+    char password[STR_LEN];
+    char currencyCode[STR_LEN];
+    double newRate;
+
+    cout << "\n" << COLOR_CYAN << "======================================================\n";
+    cout << "      UPDATE EXCHANGE RATE (ADMIN ONLY)\n";
+    cout << "======================================================\n" << COLOR_RESET;
+    cout << COLOR_YELLOW << "This function requires admin password.\n" << COLOR_RESET;
+
+    // Password verification
+    cout << COLOR_YELLOW << "Enter admin password: " << COLOR_RESET;
+    cin >> password;
+
+    if (strcmp(password, ADMIN_PASSWORD) != 0) {
+        cout << COLOR_RED << "ERROR: Incorrect password! Access denied.\n" << COLOR_RESET;
+        return;
+    }
+
+    cout << COLOR_GREEN << "Password correct. Access granted.\n" << COLOR_RESET;
+
+    // Display available currencies
+    displayCurrencies();
+
+    // Get currency to update
+    cout << COLOR_YELLOW << "Enter currency code to update: " << COLOR_RESET;
+    cin >> currencyCode;
+    toUpperCase(currencyCode);
+
+    int index = findCurrencyIndex(currencyCode);
+    if (index == -1) {
+        cout << COLOR_RED << "ERROR: Currency '" << currencyCode << "' not found!\n" << COLOR_RESET;
+        return;
+    }
+
+    // Prevent USD modification
+    if (strcmp(currencyCode, "USD") == 0) {
+        cout << COLOR_RED << "ERROR: Cannot modify the base currency (USD)!\n" << COLOR_RESET;
+        return;
+    }
+
+    // Display current rate
+    cout << "\n" << COLOR_BLUE << "Current rate for " << currencyCode 
+         << " (" << currencies[index].country << "): "
+         << currencies[index].rate << COLOR_RESET << "\n";
+
+    // Get new rate
+    cout << COLOR_YELLOW << "Enter new exchange rate: " << COLOR_RESET;
+    cin >> newRate;
+
+    // Input validation - FIXED BUG
+    if (cin.fail()) {
+        cin.clear();
+        cin.ignore(10000, '\n');
+        cout << COLOR_RED << "ERROR: Invalid input! Please enter a valid number.\n" << COLOR_RESET;
+        return;
+    }
+
+    if (newRate < 0) {
+        cout << COLOR_RED << "ERROR: Exchange rate cannot be negative!\n" << COLOR_RESET;
+        return;
+    }
+
+    if (newRate == 0) {
+        cout << COLOR_RED << "ERROR: Exchange rate cannot be zero!\n" << COLOR_RESET;
+        return;
+    }
+
+    // Update the rate
+    double oldRate = currencies[index].rate;
+    currencies[index].rate = newRate;
+
+    cout << "\n" << COLOR_CYAN << "======================================================\n";
+    cout << "      RATE UPDATED SUCCESSFULLY!\n";
+    cout << "======================================================\n" << COLOR_RESET;
+    cout << COLOR_GREEN << "Currency: " << currencyCode << " (" << currencies[index].country << ")\n";
+    cout << "Old Rate: " << oldRate << "\n";
+    cout << "New Rate: " << newRate << COLOR_RESET << "\n";
+    cout << COLOR_CYAN << "======================================================\n" << COLOR_RESET;
+}
+
+// ============ MENU OPTION 5: VIEW CONVERSION HISTORY ============
+
+void viewConversionHistory() {
+    cout << "\n" << COLOR_CYAN << "======================================================\n";
+    cout << "           CONVERSION HISTORY\n";
+    cout << "======================================================\n" << COLOR_RESET;
+
+    if (historyCount == 0) {
+        cout << COLOR_YELLOW << "No conversion history available.\n" << COLOR_RESET;
+        return;
+    }
+
+    cout << COLOR_GREEN << "Total conversions: " << historyCount << COLOR_RESET << "\n\n";
+
+    cout << COLOR_BLUE << "From    To      Amount          Result          Rate\n";
+    cout << "----    --      ------          ------          ----\n" << COLOR_RESET;
+
+    for (int i = 0; i < historyCount; i++) {
+        cout << COLOR_GREEN << history[i].fromCurrency << COLOR_RESET;
+        printSpaces(7 - strlen(history[i].fromCurrency));
+        
+        cout << COLOR_GREEN << history[i].toCurrency << COLOR_RESET;
+        printSpaces(7 - strlen(history[i].toCurrency));
+        
+        cout << history[i].amount;
+        printSpaces(15 - (int)strlen("") - (history[i].amount < 10 ? 1 : (history[i].amount < 100 ? 2 : 3)));
+        
+        cout << COLOR_MAGENTA << history[i].result << COLOR_RESET;
+        printSpaces(15 - (int)strlen(""));
+        
+        cout << COLOR_YELLOW << history[i].rateUsed << COLOR_RESET << "\n";
+    }
+    cout << COLOR_CYAN << "======================================================\n" << COLOR_RESET;
+}
+
+// ============ MENU OPTION 6: CLEAR HISTORY ============
+
+void clearHistory() {
+    cout << "\n" << COLOR_CYAN << "======================================================\n";
+    cout << "                 CLEAR HISTORY\n";
+    cout << "======================================================\n" << COLOR_RESET;
+    cout << COLOR_YELLOW << "Are you sure you want to delete all history? (y/n): " << COLOR_RESET;
+    char choice;
+    cin >> choice;
+
+    if (choice == 'y' || choice == 'Y') {
+        historyCount = 0;
+        cout << COLOR_GREEN << "History cleared successfully!\n" << COLOR_RESET;
+    } else {
+        cout << COLOR_YELLOW << "Operation cancelled.\n" << COLOR_RESET;
+    }
+}
+
+// ============ MAIN PROGRAM ============
+
+int main() {
+    int choice;
+    bool exitProgram = false;
+
+    cout << "\n" << COLOR_CYAN << "======================================================\n" << COLOR_RESET;
+    cout << COLOR_MAGENTA << "  WELCOME TO CURRENCY CONVERTER MANAGEMENT SYSTEM\n" << COLOR_RESET;
+    cout << COLOR_CYAN << "======================================================\n" << COLOR_RESET;
+    cout << COLOR_GREEN << " System initialized with " << MAX_CURRENCIES << " currencies.\n";
+    cout << COLOR_CYAN << "======================================================\n" << COLOR_RESET;
+
+    // Main loop
+    while (!exitProgram) {
+        displayMenu();
+        cin >> choice;
+
+        // Input validation for menu choice
+        if (cin.fail()) {
+            cin.clear();
+            cin.ignore(10000, '\n');
+            cout << COLOR_RED << "ERROR: Invalid choice! Please enter a number between 1 and 7.\n" << COLOR_RESET;
+            continue;
+        }
+
+        switch (choice) {
+            case 1:
+                convertCurrency();
+                if (!askToContinue()) exitProgram = true;
+                break;
+
+            case 2:
+                viewExchangeRates();
+                if (!askToContinue()) exitProgram = true;
+                break;
+
+            case 3:
+                searchCurrency();
+                if (!askToContinue()) exitProgram = true;
+                break;
+
+            case 4:
+                updateExchangeRate();
+                if (!askToContinue()) exitProgram = true;
+                break;
+
+            case 5:
+                viewConversionHistory();
+                if (!askToContinue()) exitProgram = true;
+                break;
+
+            case 6:
+                clearHistory();
+                if (!askToContinue()) exitProgram = true;
+                break;
+
+            case 7:
+                cout << "\n" << COLOR_CYAN << "======================================================\n" << COLOR_RESET;
+                cout << COLOR_GREEN << "   Thank you for using Currency Converter!\n";
+                cout << "   Total conversions performed: " << historyCount << "\n" << COLOR_RESET;
+                cout << COLOR_CYAN << "======================================================\n" << COLOR_RESET;
+                exitProgram = true;
+                break;
+
+            default:
+                cout << COLOR_RED << "ERROR: Invalid choice! Please enter a number between 1 and 7.\n" << COLOR_RESET;
+        }
+    }
+
+    return 0;
+}
